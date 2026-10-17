@@ -1,0 +1,25 @@
+# Journey of Mankind - Git Ignore Rules
+
+# Critical: Player accounts, progress, and database
+mankind_data.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs & temporary runtime outputs
+error.log
+*.log
+test_voice.mp3
+*.tmp
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE and OS files
+.vscode/
+.idea/
+Thumbs.db
+[Dd]esktop.ini
