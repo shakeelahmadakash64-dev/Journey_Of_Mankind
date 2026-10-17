@@ -5,6 +5,7 @@ Provides interruptible speech essential for blind gamers.
 """
 
 import sys
+import os
 
 class SpeechManager:
     def __init__(self):
@@ -13,6 +14,20 @@ class SpeechManager:
         self._init_speaker()
 
     def _init_speaker(self):
+        # Configure frozen paths if available
+        if getattr(sys, 'frozen', False):
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+            for sub in ['pywin32_system32', os.path.join('accessible_output2', 'lib'), 'win32', os.path.join('win32', 'lib')]:
+                p = os.path.join(base_dir, sub)
+                if os.path.isdir(p):
+                    if hasattr(os, 'add_dll_directory'):
+                        try:
+                            os.add_dll_directory(p)
+                        except Exception:
+                            pass
+                    if p not in sys.path:
+                        sys.path.insert(0, p)
+
         try:
             import accessible_output2.outputs.auto
             self.speaker = accessible_output2.outputs.auto.Auto()

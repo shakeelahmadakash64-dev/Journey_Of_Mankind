@@ -33,9 +33,17 @@ def build():
         "--collect-all", "accessible_output2",
         "--collect-all", "libloader",
         "--collect-all", "platform_utils",
+        "--collect-all", "win32com",
         "--hidden-import", "pygame",
         "--hidden-import", "sqlite3",
+        "--hidden-import", "win32com",
         "--hidden-import", "win32com.client",
+        "--hidden-import", "pywintypes",
+        "--hidden-import", "pythoncom",
+        "--hidden-import", "accessible_output2.outputs.auto",
+        "--hidden-import", "accessible_output2.outputs.nvda",
+        "--hidden-import", "accessible_output2.outputs.jaws",
+        "--hidden-import", "accessible_output2.outputs.sapi5",
         os.path.join(SCRIPT_DIR, "main.py")
     ]
     
@@ -51,8 +59,12 @@ def build():
         
     print(f"[PASS] Successfully built {exe_target}")
     
-    # Copy app_icon.ico to dist directory for installer shortcut referencing
+    # Copy app_icon.ico and sounds directly to dist directory as well
     shutil.copy2(os.path.join(SCRIPT_DIR, "app_icon.ico"), os.path.join(dist_dir, "JourneyOfMankind", "app_icon.ico"))
+    shutil.copy2(os.path.join(SCRIPT_DIR, "version.json"), os.path.join(dist_dir, "JourneyOfMankind", "version.json"))
+    dist_sounds = os.path.join(dist_dir, "JourneyOfMankind", "sounds")
+    if not os.path.exists(dist_sounds):
+        shutil.copytree(os.path.join(SCRIPT_DIR, "sounds"), dist_sounds)
     
     print("=" * 60)
     print("2. PREPARING INNO SETUP SCRIPT FOR WINDOWS 10 / 11 INSTALLER...")
@@ -89,6 +101,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
+PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0
 

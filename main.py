@@ -15,11 +15,59 @@ Features:
 import sys
 import os
 import time
+import traceback
+
+def handle_fatal_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    try:
+        appdata = os.getenv('APPDATA') or os.path.expanduser('~')
+        log_dir = os.path.join(appdata, 'JourneyOfMankind')
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, "crash_startup.log"), "w", encoding="utf-8") as f:
+            f.write(err_msg)
+    except Exception:
+        pass
+    try:
+        with open("crash_startup.log", "w", encoding="utf-8") as f:
+            f.write(err_msg)
+    except Exception:
+        pass
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, f"Journey of Mankind encountered an error:\n\n{err_msg}", "Journey of Mankind Error", 0x10)
+    except Exception:
+        pass
+
+sys.excepthook = handle_fatal_exception
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if getattr(sys, 'frozen', False):
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    base_dir = getattr(sys, '_MEIPASS', exe_dir)
+    SCRIPT_DIR = exe_dir
     os.chdir(SCRIPT_DIR)
+    
+    # Configure DLL and module search paths for Windows 10/11
+    dll_subdirs = [
+        exe_dir,
+        base_dir,
+        os.path.join(base_dir, 'pywin32_system32'),
+        os.path.join(base_dir, 'accessible_output2', 'lib'),
+        os.path.join(base_dir, 'win32'),
+        os.path.join(base_dir, 'win32', 'lib')
+    ]
+    for d in dll_subdirs:
+        if os.path.isdir(d):
+            if hasattr(os, 'add_dll_directory'):
+                try:
+                    os.add_dll_directory(d)
+                except Exception:
+                    pass
+            if d not in sys.path:
+                sys.path.insert(0, d)
 
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
@@ -48,7 +96,9 @@ class JourneyOfMankindGame:
         self.screen = pygame.display.set_mode((760, 540))
         self.font = pygame.font.SysPlusFont("Arial", 28) if hasattr(pygame.font, 'SysPlusFont') else pygame.font.SysFont("Arial", 28)
         
-        sounds_dir = os.path.join(SCRIPT_DIR, 'sounds')
+        sounds_dir = None
+        if os.path.exists(os.path.join(SCRIPT_DIR, 'sounds')):
+            sounds_dir = os.path.join(SCRIPT_DIR, 'sounds')
         self.audio = AudioManager(sounds_dir)
         self.speech = SpeechManager()
         self.db = Database()
@@ -234,9 +284,13 @@ class JourneyOfMankindGame:
             import traceback
             err_msg = traceback.format_exc()
             print(f"[Error in game loop]: {err_msg}")
-            log_path = os.path.join(SCRIPT_DIR, "error.log")
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(f"\n--- {time.ctime()} ---\n{err_msg}\n")
+            try:
+                log_dir = os.path.dirname(self.db.db_path) if hasattr(self, 'db') and self.db else SCRIPT_DIR
+                log_path = os.path.join(log_dir, "error.log")
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n--- {time.ctime()} ---\n{err_msg}\n")
+            except Exception:
+                pass
             if self.speech:
                 self.speech.speak("Runtime error caught and safely recovered. Resuming.")
             self.running = True
