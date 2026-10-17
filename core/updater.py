@@ -122,7 +122,10 @@ def download_and_apply_update(audio=None, speech=None, progress_callback=None):
     headers = {'User-Agent': 'JourneyOfMankind-Updater/1.2.0'}
     req = urllib.request.Request(ZIP_URL, headers=headers)
 
-    game_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if getattr(sys, 'frozen', False):
+        game_dir = os.path.dirname(sys.executable)
+    else:
+        game_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     temp_dir = tempfile.mkdtemp(prefix='mankind_update_')
     zip_path = os.path.join(temp_dir, 'latest_update.zip')
 

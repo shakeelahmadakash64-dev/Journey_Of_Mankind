@@ -18,8 +18,11 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
-# IDE and OS files
-.vscode/
-.idea/
-Thumbs.db
-[Dd]esktop.ini
+# Build artifacts & installers (uploaded to GitHub Releases)
+build/
+dist/
+dist_installer/
+*.exe
+*.spec
+*.iss
+test_install/

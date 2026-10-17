@@ -36,11 +36,12 @@ class SpeechManager:
         if not text:
             return
         
-        # Always output to console for visual debugging or low-vision assistance
+        # Output to console for visual debugging or low-vision assistance if available
         try:
-            print(f"[Voice] {text}")
-        except UnicodeEncodeError:
-            print(f"[Voice] {text.encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8')}")
+            if sys.stdout is not None:
+                print(f"[Voice] {text}")
+        except Exception:
+            pass
         
         if not self.speaker:
             return

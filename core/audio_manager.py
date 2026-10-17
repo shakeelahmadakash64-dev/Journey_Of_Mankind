@@ -6,13 +6,20 @@ sonar item tracking beeps, and map travel transitions.
 """
 
 import os
+import sys
 import pygame
 
 class AudioManager:
     def __init__(self, sounds_dir=None):
         if sounds_dir is None:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            sounds_dir = os.path.join(script_dir, '..', 'sounds')
+            if getattr(sys, 'frozen', False):
+                base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+                candidate1 = os.path.join(base_dir, 'sounds')
+                candidate2 = os.path.join(os.path.dirname(sys.executable), 'sounds')
+                sounds_dir = candidate1 if os.path.exists(candidate1) else candidate2
+            else:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                sounds_dir = os.path.join(script_dir, '..', 'sounds')
         self.sounds_dir = os.path.abspath(sounds_dir)
         
         # Initialize pygame mixer with low latency settings
