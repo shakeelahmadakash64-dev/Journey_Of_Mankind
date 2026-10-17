@@ -477,6 +477,7 @@ class Localization:
                 'menu_updater': "Check for Updates (GitHub)",
                 'updater_check': "Check for Updates (GitHub)",
                 'updater_install': "Download & Install Latest Update",
+                'updater_already_latest': "Your game is already at the latest version ({version}). No update is needed!",
                 'page_nav_hint': "Press Tab for Next Page, Shift + Tab for Previous Page, or Escape to return to bag.",
                 'page_read_title': "Page {cur} of {total}: {title}",
 
@@ -976,6 +977,7 @@ class Localization:
                 'menu_updater': "GitHub Update Check Karein",
                 'updater_check': "GitHub se Update Check Karein",
                 'updater_install': "Taza Tareen Update Download & Install Karein",
+                'updater_already_latest': "Aap ke paas pehle se taza tareen version ({version}) mojood hai. Kisi update ki zaroorat nahi!",
                 'page_nav_hint': "Aglay page ke liay Tab, pichlay page ke liay Shift + Tab, aur wapsi ke liay Escape dabayein.",
                 'page_read_title': "Page {cur} az {total}: {title}",
 

@@ -3,7 +3,8 @@ Journey of Mankind - GitHub Auto-Updater System
 Checks GitHub repository for latest releases and updates,
 downloads new files directly from GitHub, and safely updates game assets
 and code without overwriting player save database (mankind_data.db).
-Accessible with full speech synthesizer announcements and audio earcons.
+Fully asynchronous and accessible with speech synthesizer announcements,
+audio earcons, and active GUI message pumping to prevent Windows 'Not Responding' freezes.
 """
 
 import os
@@ -13,7 +14,10 @@ import ssl
 import shutil
 import zipfile
 import tempfile
+import threading
+import time
 import urllib.request
+import pygame
 from core.localization import loc
 
 CURRENT_VERSION = "1.2.0"
@@ -28,6 +32,39 @@ PRESERVED_FILES = {
     '.git',
     '__pycache__'
 }
+
+def pump_gui_events():
+    """Pumps pygame event queue so Windows knows the application is fully responsive."""
+    try:
+        if pygame.get_init():
+            pygame.event.pump()
+    except Exception:
+        pass
+
+def run_with_gui_pump(task_fn, *args, **kwargs):
+    """
+    Executes a blocking network or file operation in a background thread
+    while continuously pumping pygame events to prevent 'Not Responding' OS freezes.
+    """
+    res_holder = [None]
+    err_holder = [None]
+
+    def worker():
+        try:
+            res_holder[0] = task_fn(*args, **kwargs)
+        except Exception as e:
+            err_holder[0] = e
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+
+    while t.is_alive():
+        pump_gui_events()
+        time.sleep(0.03)
+
+    if err_holder[0] is not None:
+        raise err_holder[0]
+    return res_holder[0]
 
 def parse_version(ver_str):
     """Parses semantic version string like '1.2.0' into tuple of integers."""
@@ -44,24 +81,28 @@ def get_ssl_context():
     except Exception:
         return ssl._create_unverified_context()
 
+def _fetch_remote_version():
+    """Performs HTTP fetch of version.json from GitHub."""
+    ctx = get_ssl_context()
+    headers = {'User-Agent': 'JourneyOfMankind-Updater/1.2.0'}
+    req = urllib.request.Request(VERSION_URL, headers=headers)
+    with urllib.request.urlopen(req, context=ctx, timeout=8) as resp:
+        if resp.status != 200:
+            raise Exception(f"HTTP Status {resp.status}")
+        return json.loads(resp.read().decode('utf-8'))
+
 def check_for_update(audio=None, speech=None, silent=False):
     """
     Checks GitHub for the latest version of Journey of Mankind.
+    Keeps GUI responsive and never freezes the application.
     Returns: (has_update, remote_info, message)
     """
     if not silent and speech:
         checking_msg = "Checking GitHub for updates..." if loc.lang == 'en' else "GitHub se update check ki ja rahi hai..."
         speech.speak(checking_msg)
 
-    ctx = get_ssl_context()
-    headers = {'User-Agent': 'JourneyOfMankind-Updater/1.2.0'}
-    req = urllib.request.Request(VERSION_URL, headers=headers)
-
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=8) as resp:
-            if resp.status != 200:
-                raise Exception(f"HTTP Status {resp.status}")
-            data = json.loads(resp.read().decode('utf-8'))
+        data = run_with_gui_pump(_fetch_remote_version)
 
         remote_ver_str = data.get('version', '1.0.0')
         remote_ver = parse_version(remote_ver_str)
@@ -83,10 +124,7 @@ def check_for_update(audio=None, speech=None, silent=False):
                     speech.speak(msg)
             return (True, data, msg)
         else:
-            msg = (
-                f"Your game is up to date (Version {CURRENT_VERSION}). No new updates available." if loc.lang == 'en' else
-                f"Aap ki game bilkul updated hai (Version {CURRENT_VERSION}). Koi nayi update darkaar nahi."
-            )
+            msg = loc.tr('updater_already_latest', version=CURRENT_VERSION)
             if not silent:
                 if audio:
                     audio.play("menu_select")
@@ -106,10 +144,43 @@ def check_for_update(audio=None, speech=None, silent=False):
                 speech.speak(err_msg)
         return (False, None, err_msg)
 
+def _download_and_extract(progress_callback=None):
+    """Downloads ZIP archive from GitHub and unpacks to temporary directory."""
+    ctx = get_ssl_context()
+    headers = {'User-Agent': 'JourneyOfMankind-Updater/1.2.0'}
+    req = urllib.request.Request(ZIP_URL, headers=headers)
+
+    temp_dir = tempfile.mkdtemp(prefix='mankind_update_')
+    zip_path = os.path.join(temp_dir, 'latest_update.zip')
+
+    with urllib.request.urlopen(req, context=ctx, timeout=30) as resp, open(zip_path, 'wb') as out_f:
+        total_size = resp.getheader('Content-Length')
+        total_size = int(total_size) if total_size else None
+        downloaded = 0
+        block_size = 65536
+        while True:
+            chunk = resp.read(block_size)
+            if not chunk:
+                break
+            out_f.write(chunk)
+            downloaded += len(chunk)
+            pump_gui_events()
+            if progress_callback:
+                progress_callback(downloaded, total_size)
+
+    extract_dir = os.path.join(temp_dir, 'extracted')
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        zf.extractall(extract_dir)
+
+    inner_dirs = [os.path.join(extract_dir, d) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+    src_root = inner_dirs[0] if inner_dirs else extract_dir
+    return temp_dir, src_root
+
 def download_and_apply_update(audio=None, speech=None, progress_callback=None):
     """
     Downloads the latest zip repository from GitHub, extracts it,
     and updates game files while strictly preserving player database (mankind_data.db).
+    Guarantees no UI freeze during download and extraction.
     Returns: (success, message)
     """
     msg_start = "Downloading latest update from GitHub..." if loc.lang == 'en' else "GitHub se taza tareen update download ho rahi hai..."
@@ -118,45 +189,18 @@ def download_and_apply_update(audio=None, speech=None, progress_callback=None):
     if audio:
         audio.play_sonar_beep()
 
-    ctx = get_ssl_context()
-    headers = {'User-Agent': 'JourneyOfMankind-Updater/1.2.0'}
-    req = urllib.request.Request(ZIP_URL, headers=headers)
-
     if getattr(sys, 'frozen', False):
         game_dir = os.path.dirname(sys.executable)
     else:
         game_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    temp_dir = tempfile.mkdtemp(prefix='mankind_update_')
-    zip_path = os.path.join(temp_dir, 'latest_update.zip')
 
+    temp_dir = None
     try:
-        # Download ZIP
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp, open(zip_path, 'wb') as out_f:
-            total_size = resp.getheader('Content-Length')
-            total_size = int(total_size) if total_size else None
-            downloaded = 0
-            block_size = 65536
-            while True:
-                chunk = resp.read(block_size)
-                if not chunk:
-                    break
-                out_f.write(chunk)
-                downloaded += len(chunk)
-                if progress_callback:
-                    progress_callback(downloaded, total_size)
+        temp_dir, src_root = run_with_gui_pump(_download_and_extract, progress_callback)
 
-        msg_extract = "Extracting and applying update..." if loc.lang == 'en' else "Update files extract aur install ho rahi hain..."
+        msg_extract = "Applying updated files..." if loc.lang == 'en' else "Update files install ho rahi hain..."
         if speech:
             speech.speak(msg_extract)
-
-        # Unzip
-        extract_dir = os.path.join(temp_dir, 'extracted')
-        with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall(extract_dir)
-
-        # Find the inner directory created by GitHub (e.g. Journey_Of_Mankind-main)
-        inner_dirs = [os.path.join(extract_dir, d) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
-        src_root = inner_dirs[0] if inner_dirs else extract_dir
 
         # Copy updated files over game_dir, skipping preserved files
         copied_count = 0
@@ -177,6 +221,7 @@ def download_and_apply_update(audio=None, speech=None, progress_callback=None):
                 dest_file = os.path.join(dest_dir, f)
                 shutil.copy2(src_file, dest_file)
                 copied_count += 1
+                pump_gui_events()
 
         success_msg = (
             f"Update completed successfully ({copied_count} files updated)! Your save data is safe. Please restart the game." if loc.lang == 'en' else
@@ -202,31 +247,32 @@ def download_and_apply_update(audio=None, speech=None, progress_callback=None):
         return (False, fail_msg)
 
     finally:
-        try:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except Exception:
-            pass
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
 
 def open_updater_menu(screen=None, audio=None, speech=None):
     """Interactive Accessible Menu for checking and applying GitHub updates."""
     from game.menu import AccessibleMenu
 
     def run_check():
-        has_update, info, msg = check_for_update(audio=audio, speech=speech, silent=False)
+        check_for_update(audio=audio, speech=speech, silent=False)
         return "CHECKED"
 
     def run_apply():
+        # First check if an update is genuinely available without audible chime
         has_update, info, _ = check_for_update(audio=audio, speech=speech, silent=True)
         if has_update:
             download_and_apply_update(audio=audio, speech=speech)
         else:
-            msg = (
-                f"You already have the latest version (v{CURRENT_VERSION})! Re-installing latest build from GitHub..." if loc.lang == 'en' else
-                f"Aap ke paas pehle se latest version (v{CURRENT_VERSION}) mojood hai! Dobara reinstall kiya ja raha hai..."
-            )
+            # Player already has the latest version: Do NOT download, speak confirmation clearly!
+            latest_msg = loc.tr('updater_already_latest', version=CURRENT_VERSION)
+            if audio:
+                audio.play("menu_select")
             if speech:
-                speech.speak(msg)
-            download_and_apply_update(audio=audio, speech=speech)
+                speech.speak(latest_msg)
         return "APPLIED"
 
     options = [
@@ -248,3 +294,5 @@ if __name__ == '__main__':
         if ans == 'y':
             ok, res = download_and_apply_update()
             print(res)
+    else:
+        print("No update needed. You have the latest version.")
