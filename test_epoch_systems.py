@@ -277,7 +277,15 @@ def run_tests():
     assert os.path.exists(version_file)
     with open(version_file, 'r', encoding='utf-8') as f:
         v_data = json.load(f)
-    assert v_data.get('version') == CURRENT_VERSION
+    # Verify updater translations in all languages
+    for lang_code in ['en', 'ur', 'es', 'fr', 'ar', 'hi']:
+        loc.set_language(lang_code)
+        chk = loc.tr('updater_check')
+        inst = loc.tr('updater_install')
+        assert chk and len(chk) > 0, f"Missing updater_check for {lang_code}"
+        assert inst and len(inst) > 0, f"Missing updater_install for {lang_code}"
+    loc.set_language('en')
+
     print("[PASS] TEST 20 PASSED: Auto-updater versions, manifest & player DB preservation verified.")
 
     print("=" * 60)

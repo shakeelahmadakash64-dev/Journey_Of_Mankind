@@ -230,8 +230,8 @@ def open_updater_menu(screen=None, audio=None, speech=None):
         return "APPLIED"
 
     options = [
-        (loc.tr('updater_check') if 'updater_check' in loc.translations['en'] else "Check for Updates (GitHub)", run_check),
-        (loc.tr('updater_install') if 'updater_install' in loc.translations['en'] else "Download & Install Latest Update", run_apply),
+        (loc.tr('updater_check'), run_check),
+        (loc.tr('updater_install'), run_apply),
         (loc.tr('back'), lambda: "BACK")
     ]
 
