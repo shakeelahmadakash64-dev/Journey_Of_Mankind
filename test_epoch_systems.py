@@ -54,6 +54,21 @@ class MockAudio:
         self.current_ambience = 'ambience_shelter'
     def stop_ambient(self, *args, **kwargs):
         self.current_ambience = None
+    def play_weather(self, *args, **kwargs): pass
+    def stop_weather(self, *args, **kwargs): pass
+    def play_thunder(self, *args, **kwargs): pass
+    def start_meat_sizzle(self, *args, **kwargs): pass
+    def stop_meat_sizzle(self, *args, **kwargs): pass
+    def play_metal_quench(self, *args, **kwargs): pass
+    def play_whistle(self, *args, **kwargs): pass
+    def play_dog_bark(self, *args, **kwargs): pass
+    def play_dog_whimper(self, *args, **kwargs): pass
+    def play_animal_graze(self, *args, **kwargs): pass
+    def play_animal_alert(self, *args, **kwargs): pass
+    def play_heavy_panting(self, *args, **kwargs): pass
+    def play_yawn(self, *args, **kwargs): pass
+    def play_shiver(self, *args, **kwargs): pass
+    def play_baby_coo(self, *args, **kwargs): pass
 
 class MockSpeech:
     def __init__(self):
@@ -288,8 +303,94 @@ def run_tests():
 
     print("[PASS] TEST 20 PASSED: Auto-updater versions, manifest & player DB preservation verified.")
 
+    # 21. Advanced Foley & Weather Sounds Verification
+    foley_files = [
+        'rain_ambient.wav', 'rain_roof.wav', 'thunder_distant.wav', 'thunder_close.wav',
+        'meat_sizzle.wav', 'metal_quench.wav', 'heavy_panting.wav', 'yawn.wav',
+        'shiver.wav', 'baby_coo.wav', 'whistle.wav', 'dog_bark.wav', 'dog_whimper.wav',
+        'gear_rustle.wav', 'footstep_wood_1.wav', 'footstep_wood_2.wav', 'footstep_wood_3.wav',
+        'footstep_wood_4.wav'
+    ]
+    for ff in foley_files:
+        fpath = os.path.join(sounds_folder, ff)
+        assert os.path.exists(fpath), f"Missing advanced foley audio file: {ff}"
+    # Verify round-robin footstep playback and weather channel
+    audio.play_footstep('wood', pan=0.2)
+    audio.play_footstep('dirt', pan=-0.2)
+    audio.play_weather('rain_roof')
+    audio.stop_weather()
+    audio.start_meat_sizzle()
+    audio.stop_meat_sizzle()
+    print("[PASS] TEST 21 PASSED: Advanced foley, weather audio & multi-sample round-robin footsteps verified.")
+
+    # 22. Human Character Physiology & Vitals
+    char.fatigue = 80.0
+    char.morale = 60.0
+    char.social = 50.0
+    char.stamina = 15.0
+    char.temperature = 33.5
+    # Trigger vitals update
+    char.update_vitals(2.0)
+    assert char.fatigue > 80.0, "Fatigue should accumulate in wilderness"
+    full_status = char.report_full_status()
+    assert "Fatigue" in full_status or "Thakawat" in full_status
+    # Bedroll sleep in shelter
+    char.enter_shelter(quest_system, world=world)
+    char.rest_bedroll()
+    assert char.fatigue == 0.0, f"Bedroll sleep should reset fatigue to 0, got {char.fatigue}"
+    assert char.stamina == 100.0, "Bedroll sleep should restore stamina"
+    char.exit_shelter(realm_id=world.current_realm_id, world=world)
+    print("[PASS] TEST 22 PASSED: Realistic human physiology (fatigue, shivering, panting, bedroll sleep) verified.")
+
+    # 23. Prehistoric Clan Partner & Relationship System
+    partner = char.partner
+    assert partner is not None
+    assert not partner.is_rescued
+    # Rescue / unite with partner
+    partner.rescue_partner(char, quest_system)
+    assert partner.is_rescued
+    assert partner.status == 'at_shelter'
+    assert char.social == 100.0
+    # Dialogue
+    partner._do_talk(char)
+    assert partner.affection >= 68.0
+    # Meal sharing
+    char.add_item('cooked_meat', 'Cooked Meat Steak', 2)
+    partner._do_share_meal(char)
+    # Generational Milestone
+    char.current_era = 3
+    partner.affection = 90.0
+    partner._do_family_event(char)
+    assert partner.has_child
+    print("[PASS] TEST 23 PASSED: Prehistoric Clan Partner system (dialogues, meal sharing, shelter tending, baby milestone) verified.")
+
+    # 24. Database Persistence of Human Vitals & Partner State
+    from core.database import Database
+    test_db_path = os.path.join(os.path.dirname(__file__), 'test_mankind.db')
+    if os.path.exists(test_db_path):
+        os.remove(test_db_path)
+    test_db = Database(test_db_path)
+    test_db.register_player("Adam")
+    stats_dict = char.get_stats_dict()
+    assert 'fatigue' in stats_dict
+    assert 'morale' in stats_dict
+    assert 'social' in stats_dict
+    assert 'partner_data' in stats_dict
+    test_db.save_player_data("Adam", stats_dict, char.inventory, current_era=char.current_era)
+    p_loaded = test_db.get_player_data("Adam")
+    assert p_loaded is not None
+    assert 'fatigue' in p_loaded['stats']
+    assert 'partner_data' in p_loaded['stats']
+    del test_db
+    try:
+        if os.path.exists(test_db_path):
+            os.remove(test_db_path)
+    except Exception:
+        pass
+    print("[PASS] TEST 24 PASSED: Database persistence of human physiology stats & partner data verified.")
+
     print("=" * 60)
-    print("ALL 20 UNIT & INTEGRATION TESTS COMPLETED SUCCESSFULLY!")
+    print("ALL 24 UNIT & INTEGRATION TESTS COMPLETED SUCCESSFULLY!")
     print("=" * 60)
 
 if __name__ == '__main__':

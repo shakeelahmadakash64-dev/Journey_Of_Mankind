@@ -166,6 +166,7 @@ class JourneyOfMankindGame:
                 (loc.tr('menu_new_account'), self.action_create_account),
                 (loc.tr('menu_select_account'), self.action_select_account),
                 (f"{loc.tr('menu_language')} ({cur_lang_str})", self.action_toggle_language),
+                (loc.tr('menu_audio_settings'), self.action_open_audio_settings),
                 (loc.tr('menu_updater'), lambda: open_updater_menu(self.screen, self.audio, self.speech)),
                 (loc.tr('menu_help'), self.action_show_help),
                 (loc.tr('menu_quit'), self.action_quit)
@@ -174,6 +175,67 @@ class JourneyOfMankindGame:
             menu = AccessibleMenu(loc.tr('menu_title'), options, self.audio, self.speech)
             result = menu.run(self.screen)
             if result == "QUIT" or not self.running:
+                break
+
+    def action_open_audio_settings(self):
+        """Interactive Accessible Audio & Volume Settings Menu."""
+        while True:
+            cur_master = int(round(self.audio.game_volume * 100))
+            cur_ambient = int(round(self.audio.ambient_volume * 100))
+            cur_weather = int(round(self.audio.weather_volume * 100))
+            cur_sfx = int(round(self.audio.sfx_volume * 100))
+
+            def make_master_changer():
+                def _change():
+                    next_v = (cur_master + 20) if cur_master < 100 else 0
+                    delta = (next_v - cur_master) / 100.0
+                    new_val = self.audio.change_game_volume(delta)
+                    msg = loc.tr('audio_master_vol', val=new_val)
+                    if self.speech: self.speech.speak(msg)
+                    if self.audio: self.audio.play_menu_select()
+                return _change
+
+            def make_ambient_changer():
+                def _change():
+                    next_v = (cur_ambient + 20) if cur_ambient < 100 else 0
+                    delta = (next_v - cur_ambient) / 100.0
+                    new_val = self.audio.change_ambient_volume(delta)
+                    msg = loc.tr('audio_ambient_vol', val=new_val)
+                    if self.speech: self.speech.speak(msg)
+                    if self.audio: self.audio.play_menu_select()
+                return _change
+
+            def make_weather_changer():
+                def _change():
+                    next_v = (cur_weather + 20) if cur_weather < 100 else 0
+                    delta = (next_v - cur_weather) / 100.0
+                    new_val = self.audio.change_weather_volume(delta)
+                    msg = loc.tr('audio_weather_vol', val=new_val)
+                    if self.speech: self.speech.speak(msg)
+                    if self.audio: self.audio.play_menu_select()
+                return _change
+
+            def make_sfx_changer():
+                def _change():
+                    next_v = (cur_sfx + 20) if cur_sfx < 100 else 0
+                    delta = (next_v - cur_sfx) / 100.0
+                    new_val = self.audio.change_sfx_volume(delta)
+                    msg = loc.tr('audio_sfx_vol', val=new_val)
+                    if self.speech: self.speech.speak(msg)
+                    if self.audio: self.audio.play_menu_select()
+                return _change
+
+            options = [
+                (f"{loc.tr('audio_master_vol', val=cur_master)} (Enter to change)", make_master_changer()),
+                (f"{loc.tr('audio_ambient_vol', val=cur_ambient)} (Enter to change)", make_ambient_changer()),
+                (f"{loc.tr('audio_weather_vol', val=cur_weather)} (Enter to change)", make_weather_changer()),
+                (f"{loc.tr('audio_sfx_vol', val=cur_sfx)} (Enter to change)", make_sfx_changer()),
+                (loc.tr('back'), lambda: "BACK")
+            ]
+
+            menu = AccessibleMenu(loc.tr('audio_settings_title'), options, self.audio, self.speech)
+            res = menu.run(self.screen)
+            if res == "BACK" or res == "QUIT":
                 break
 
     def action_toggle_language(self):
@@ -455,7 +517,7 @@ class JourneyOfMankindGame:
         if is_shift:
             if getattr(self.character, 'is_inside_shelter', False):
                 if getattr(self.character, 'shelter_x', 0) == 0 and getattr(self.character, 'shelter_y', -1) == -2:
-                    self.character.exit_shelter(realm_id=self.world.current_realm_id)
+                    self.character.exit_shelter(realm_id=self.world.current_realm_id, world=self.world)
                 else:
                     msg = loc.tr('shelter_must_walk_to_door')
                     if self.speech:
@@ -466,7 +528,7 @@ class JourneyOfMankindGame:
 
             cur_tile = self.world.get_tile(self.character.pos_x, self.character.pos_y)
             if cur_tile and cur_tile.is_shelter:
-                self.character.enter_shelter(self.quest_system)
+                self.character.enter_shelter(self.quest_system, world=self.world)
                 return
 
             self.world.handle_realm_travel(self.character, self.screen)
@@ -506,7 +568,7 @@ class JourneyOfMankindGame:
                     self.last_scan_mode = None
                     self.last_scan_target = None
                     if item_info.get('is_shelter'):
-                        self.character.enter_shelter(self.quest_system)
+                        self.character.enter_shelter(self.quest_system, world=self.world)
                     else:
                         self.world.interact_current_tile(self.character)
                     return
@@ -655,9 +717,11 @@ class JourneyOfMankindGame:
             self.world.build_shelter_at(self.character, self.quest_system)
 
     def action_open_tab_menu(self):
-        """Called on Key TAB: In-game Quick Hub containing Quests & Epoch Journal, Language Switcher, Journey Diary, and Time/Weather."""
+        """Called on Key TAB: In-game Quick Hub containing Quests & Epoch Journal, Language Switcher, Life Partner, Audio Settings, Journey Diary, and Time/Weather."""
         options = [
             (loc.tr('tab_menu_quests'), self._open_quests_menu),
+            (loc.tr('tab_menu_partner'), lambda: self.character.partner.open_partner_menu(self.character, self.screen)),
+            (loc.tr('tab_menu_audio_settings'), self.action_open_audio_settings),
             (loc.tr('tab_menu_lang'), self._open_language_menu),
             (loc.tr('tab_menu_diary'), lambda: self.quest_system.read_diary(self.character, self.screen)),
             (loc.tr('tab_menu_updater'), lambda: open_updater_menu(self.screen, self.audio, self.speech)),
@@ -751,7 +815,7 @@ class JourneyOfMankindGame:
                 elapsed = now - last_vital_tick
                 last_vital_tick = now
                 self.character.update_vitals(elapsed)
-                self.world.update_time(elapsed)
+                self.world.update_time(elapsed, self.character)
 
             # Audio cues & nearby creature sounds tick
             if now - last_audio_cue_tick >= 5.0:
@@ -771,6 +835,7 @@ class JourneyOfMankindGame:
             creature_str = f"Beast Nearby: {creature_here.name} (HP: {creature_here.health})" if creature_here else "Wild Area (Clear)"
             
             pet_str = f" | Companion: {self.character.pet['name']}" if getattr(self.character, 'pet', None) else ""
+            partner_str = f" | Partner: {self.character.partner.name}" if getattr(self.character, 'partner', None) and self.character.partner.is_rescued else ""
             era_str = self.quest_system.get_era_name()
             hour, phase, _ = self.world.get_time_of_day()
             weather_str = self.world.get_weather_name()
@@ -780,12 +845,12 @@ class JourneyOfMankindGame:
             self.render_screen(f"{loc.tr('game_title')} - {self.current_user} [{era_str}]{shelter_status}", [
                 f"Realm: {self.world.current_realm_id.upper()} | Area: {cur_tile.name if cur_tile else 'Wilderness'} ({self.character.pos_x}, {self.character.pos_y}) | Elevation: {elev_str}{portal_str}",
                 f"Facing: {self.character.facing} ({self.character.facing_degrees}°) | Time: {hour:02d}:00 ({phase}) | Weather: {weather_str}",
-                f"Health: {int(self.character.health)}% | Hunger: {int(self.character.hunger)}% | Thirst: {int(self.character.thirst)}% | Stamina: {int(self.character.stamina)}%{pet_str}",
+                f"HP: {int(self.character.health)}% | Hunger: {int(self.character.hunger)}% | Thirst: {int(self.character.thirst)}% | Stamina: {int(self.character.stamina)}% | Fatigue: {int(self.character.fatigue)}% | Morale: {int(self.character.morale)}%{pet_str}{partner_str}",
                 f"Creature: {creature_str}",
                 "[Arrows]=Walk | [Shift+Arrows]=Turn Face | [C/D]=Compass & GPS | [N]=Time/Weather",
                 "[Shift+Page Up/Down]=BG Vol | [Home/End]=Game Vol | [Shift+C/F]=Campfire",
                 "[Space]=Attack/Use | [Enter]=Lock/Pick | [Shift+Enter]=Shelter In/Out | [B]=Shelter",
-                "[Tab]=Quick Hub (Quests & Lang) | [J]=Diary | [I]=Satchel Bag (Textbooks) | [1]=Eat",
+                "[Tab]=Quick Hub | [P]=Whistle Companion / Partner | [Z]=Full Vitals | [1]=Eat",
                 "[M]=Cycle Items & Shelters | [A]=Cycle Animals | [K]=Travel Gateways | [O]=Target Status"
             ])
 
@@ -842,11 +907,11 @@ class JourneyOfMankindGame:
                         elif event.key == pygame.K_y:
                             self.character.report_stamina()
                         elif event.key == pygame.K_b:
-                            self.character.stamina = min(100.0, self.character.stamina + 40.0)
-                            self.character.health = min(100.0, self.character.health + 20.0)
-                            self.character.temperature = 37.0
-                            if self.audio: self.audio.play("menu_select")
-                            if self.speech: self.speech.speak(loc.tr('shelter_rested'))
+                            self.character.rest_bedroll()
+                        elif event.key in (pygame.K_p, pygame.K_t):
+                            self.character.partner.open_partner_menu(self.character, self.screen)
+                        elif event.key == pygame.K_z:
+                            self.character.report_full_status()
                         continue
 
                     # Directional Movement & In-Place Facing
@@ -978,12 +1043,26 @@ class JourneyOfMankindGame:
                     elif event.key == pygame.K_s:
                         self.character.report_stamina()
 
-                    # Animal Taming (T Key) OR Shift + T for Temperature
+                    elif event.key == pygame.K_y:
+                        self.character.report_fatigue()
+
+                    # Whistle for Canine Companion (P Key)
+                    elif event.key == pygame.K_p:
+                        self.character.whistle_companion()
+
+                    # Full Human Vitals & Sanity Report (Z Key)
+                    elif event.key == pygame.K_z:
+                        self.character.report_full_status()
+
+                    # Animal Taming / Life Partner Interaction (T Key) OR Shift + T for Temperature
                     elif event.key == pygame.K_t:
                         if is_shift:
                             self.character.report_temperature()
                         else:
-                            self.action_tame_nearby_creature()
+                            if self.character.partner.is_rescued and self.character.partner.status == 'with_player':
+                                self.character.partner.open_partner_menu(self.character, self.screen)
+                            else:
+                                self.action_tame_nearby_creature()
 
                     # Primitive Lean-to Shelter / Rest (B Key)
                     elif event.key == pygame.K_b:

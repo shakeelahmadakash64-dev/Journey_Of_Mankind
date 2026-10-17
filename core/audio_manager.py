@@ -7,6 +7,7 @@ sonar item tracking beeps, and map travel transitions.
 
 import os
 import sys
+import random
 import pygame
 
 class AudioManager:
@@ -26,27 +27,48 @@ class AudioManager:
         if not pygame.mixer.get_init():
             pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
             pygame.mixer.init()
-            pygame.mixer.set_num_channels(28)
+            pygame.mixer.set_num_channels(32)
         
         self.sounds = {}
         self.ambient_channel = pygame.mixer.Channel(0)
         self.creature_channel = pygame.mixer.Channel(1)
         self.tracker_channel = pygame.mixer.Channel(2)
-        self.footstep_index = 0
+        self.weather_channel = pygame.mixer.Channel(3)
+        self.cooking_channel = pygame.mixer.Channel(4)
+        
+        self.step_counter = 0
+        self.last_step_var = 1
         self.current_realm_ambience = None
+        self.current_weather_audio = None
+        
         self.ambient_volume = 0.4
+        self.weather_volume = 0.5
+        self.sfx_volume = 1.0
         self.game_volume = 1.0
         self.load_all_sounds()
 
     def change_ambient_volume(self, delta):
         """Adjusts background ambient volume by delta and updates channel immediately. Returns 0-100 percentage."""
         self.ambient_volume = max(0.0, min(1.0, round(self.ambient_volume + delta, 2)))
-        self.ambient_channel.set_volume(self.ambient_volume, self.ambient_volume)
+        self.ambient_channel.set_volume(self.ambient_volume * self.game_volume, self.ambient_volume * self.game_volume)
         return int(round(self.ambient_volume * 100))
+
+    def change_weather_volume(self, delta):
+        """Adjusts weather ambient volume by delta and updates channel immediately. Returns 0-100 percentage."""
+        self.weather_volume = max(0.0, min(1.0, round(self.weather_volume + delta, 2)))
+        self.weather_channel.set_volume(self.weather_volume * self.game_volume, self.weather_volume * self.game_volume)
+        return int(round(self.weather_volume * 100))
+
+    def change_sfx_volume(self, delta):
+        """Adjusts sound effects volume by delta. Returns 0-100 percentage."""
+        self.sfx_volume = max(0.0, min(1.0, round(self.sfx_volume + delta, 2)))
+        return int(round(self.sfx_volume * 100))
 
     def change_game_volume(self, delta):
         """Adjusts game master SFX volume by delta. Returns 0-100 percentage."""
         self.game_volume = max(0.0, min(1.0, round(self.game_volume + delta, 2)))
+        self.ambient_channel.set_volume(self.ambient_volume * self.game_volume, self.ambient_volume * self.game_volume)
+        self.weather_channel.set_volume(self.weather_volume * self.game_volume, self.weather_volume * self.game_volume)
         return int(round(self.game_volume * 100))
 
     def load_all_sounds(self):
@@ -80,7 +102,7 @@ class AudioManager:
             left_vol = 1.0 - pan
             right_vol = 1.0
             
-        eff_vol = volume * self.game_volume
+        eff_vol = volume * self.game_volume * self.sfx_volume
         left_vol *= eff_vol
         right_vol *= eff_vol
         
@@ -124,19 +146,32 @@ class AudioManager:
         self.current_realm_ambience = None
 
     def play_footstep(self, surface='dirt', pan=0.0):
-        """Plays ultra-realistic alternating left/right footsteps with physical stereo staging."""
-        self.footstep_index = 1 if self.footstep_index == 2 else 2
-        key = f"footstep_{surface}_{self.footstep_index}"
+        """Plays ultra-realistic multi-sample footsteps with round-robin variations, acoustic panning, and gear rustle."""
+        self.step_counter += 1
+        possible_vars = [1, 2, 3, 4]
+        if self.last_step_var in possible_vars:
+            possible_vars.remove(self.last_step_var)
+        chosen_var = random.choice(possible_vars) if possible_vars else 1
+        self.last_step_var = chosen_var
+
+        key = f"footstep_{surface}_{chosen_var}"
+        if key not in self.sounds:
+            key = f"footstep_{surface}_1"
         if key not in self.sounds:
             key = f"footstep_{surface}"
         if key not in self.sounds:
-            key = f"footstep_dirt_{self.footstep_index}"
+            key = f"footstep_dirt_{chosen_var}"
         if key not in self.sounds:
             key = "footstep_dirt"
             
-        foot_pan_offset = -0.15 if self.footstep_index == 1 else 0.15
+        foot_pan_offset = -0.15 if (self.step_counter % 2 == 1) else 0.15
         effective_pan = max(-1.0, min(1.0, pan + foot_pan_offset))
-        self.play(key, pan=effective_pan, volume=0.8)
+        jitter_vol = random.uniform(0.72, 0.85)
+        self.play(key, pan=effective_pan, volume=jitter_vol)
+
+        # Every 3 steps, trigger soft tactile leather/gear rustle
+        if self.step_counter % 3 == 0:
+            self.play("gear_rustle", pan=0.0, volume=0.32)
 
     def play_voice_attack(self):
         self.play("voice_attack", pan=0.0, volume=0.9)
@@ -240,4 +275,68 @@ class AudioManager:
 
     def play_portalopen(self):
         self.play("portalopen", pan=0.0, volume=0.9)
+
+    # Dynamic Weather Audio (Rain, Roof Muffle, Thunder)
+    def play_weather(self, weather_key, volume=None):
+        """Play continuous ambient weather audio on dedicated weather channel."""
+        if weather_key not in self.sounds:
+            return
+        if volume is not None:
+            self.weather_volume = max(0.0, min(1.0, volume))
+        if self.current_weather_audio != weather_key:
+            self.current_weather_audio = weather_key
+            sound = self.sounds[weather_key]
+            eff_vol = self.weather_volume * self.game_volume
+            self.weather_channel.set_volume(eff_vol, eff_vol)
+            self.weather_channel.play(sound, loops=-1)
+
+    def stop_weather(self):
+        self.weather_channel.stop()
+        self.current_weather_audio = None
+
+    def play_thunder(self, close=False, pan=0.0):
+        key = "thunder_close" if close else "thunder_distant"
+        self.play(key, pan=pan, volume=0.95)
+
+    # Cooking & Metallurgy Audio
+    def start_meat_sizzle(self):
+        if 'meat_sizzle' in self.sounds:
+            eff_vol = 0.85 * self.game_volume * self.sfx_volume
+            self.cooking_channel.set_volume(eff_vol, eff_vol)
+            self.cooking_channel.play(self.sounds['meat_sizzle'], loops=-1)
+
+    def stop_meat_sizzle(self):
+        self.cooking_channel.stop()
+
+    def play_metal_quench(self):
+        self.play("metal_quench", pan=0.0, volume=0.92)
+
+    # Canine Companion & Wildlife Audio
+    def play_whistle(self):
+        self.play("whistle", pan=0.0, volume=0.9)
+
+    def play_dog_bark(self, pan=0.0):
+        self.play("dog_bark", pan=pan, volume=0.88)
+
+    def play_dog_whimper(self, pan=0.0):
+        self.play("dog_whimper", pan=pan, volume=0.8)
+
+    def play_animal_graze(self, pan=0.0):
+        self.play("animal_graze", pan=pan, volume=0.75)
+
+    def play_animal_alert(self, pan=0.0):
+        self.play("animal_alert", pan=pan, volume=0.85)
+
+    # Human Physiology & Family Audio
+    def play_heavy_panting(self):
+        self.play("heavy_panting", pan=0.0, volume=0.85)
+
+    def play_yawn(self):
+        self.play("yawn", pan=0.0, volume=0.82)
+
+    def play_shiver(self):
+        self.play("shiver", pan=0.0, volume=0.85)
+
+    def play_baby_coo(self):
+        self.play("baby_coo", pan=0.0, volume=0.9)
 

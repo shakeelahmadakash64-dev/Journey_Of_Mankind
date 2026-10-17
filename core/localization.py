@@ -481,6 +481,37 @@ class Localization:
                 'page_nav_hint': "Press Tab for Next Page, Shift + Tab for Previous Page, or Escape to return to bag.",
                 'page_read_title': "Page {cur} of {total}: {title}",
 
+                # Partner & Family System
+                'partner_title': "Clan Companion & Life Partner",
+                'partner_talk': "Talk / Share Heartfelt Words",
+                'partner_gift': "Offer Gift / Token of Affection",
+                'partner_gift_title': "Select Gift from Satchel",
+                'partner_meal': "Share a Warm Hearth Meal",
+                'partner_role': "Companion Role",
+                'partner_family': "Pass Legacy / Cradle Next Generation",
+                'tab_menu_partner': "Life Partner & Companion Hub",
+
+                # Realistic Human Needs & Physiology
+                'fatigue_report': "Fatigue: {val} percent.",
+                'fatigue_alert': "You are utterly exhausted and yawning. Rest upon the soft bedroll inside your shelter!",
+                'morale_report': "Morale & Sanity: {val} percent.",
+                'social_report': "Social Connection: {val} percent.",
+                'full_human_status': "Vitals: Health {health}%, Hunger {hunger}%, Thirst {thirst}%, Stamina {stamina}%, Temp {temp}C, Fatigue {fatigue}%, Morale {morale}%, Social {social}%.",
+                'whistle_companion_bark': "You whistled sharply! Your faithful canine companion barks joyfully and bounds to your side.",
+                'whistle_companion_none': "You whistled into the wind, but no beast answered. Feed meat to a wild wolf to tame a loyal companion (Key T).",
+                'bedroll_sleep': "You curled up upon the warm fur bedroll. Restful slumber embraces you, washing away exhaustion and restoring your strength.",
+
+                # Audio Settings Menu
+                'menu_audio_settings': "Audio Settings & Volume Controls",
+                'tab_menu_audio_settings': "Audio & Volume Controls",
+                'audio_settings_title': "Audio Settings & Volume Controls",
+                'audio_master_vol': "Master Game Volume: {val}%",
+                'audio_ambient_vol': "Realm Ambience Volume: {val}%",
+                'audio_weather_vol': "Dynamic Weather Volume: {val}%",
+                'audio_sfx_vol': "Sound Effects (SFX) Volume: {val}%",
+                'audio_vol_up': "Increase Volume (+10%)",
+                'audio_vol_down': "Decrease Volume (-10%)",
+
                 # Controls Guide
                 'controls_guide': (
                     "Complete Controls Guide: "
@@ -980,6 +1011,37 @@ class Localization:
                 'updater_already_latest': "Aap ke paas pehle se taza tareen version ({version}) mojood hai. Kisi update ki zaroorat nahi!",
                 'page_nav_hint': "Aglay page ke liay Tab, pichlay page ke liay Shift + Tab, aur wapsi ke liay Escape dabayein.",
                 'page_read_title': "Page {cur} az {total}: {title}",
+
+                # Partner & Family System
+                'partner_title': "Hamsafar aur Qabila Sathi",
+                'partner_talk': "Dil ki Baat / Guftagoo",
+                'partner_gift': "Tohfa Dein / Pyar ka Izhar",
+                'partner_gift_title': "Bag se Tohfa Chunein",
+                'partner_meal': "Choolhay ka Garm Khana Share Karein",
+                'partner_role': "Sathi ka Kirdar",
+                'partner_family': "Insani Nasl ka Aaghaz / Bachay ki Pedaish",
+                'tab_menu_partner': "Hamsafar aur Sathi Menu",
+
+                # Realistic Human Needs & Physiology
+                'fatigue_report': "Thakawat: {val} feesad.",
+                'fatigue_alert': "Aap shadeed thakawat aur neend se nidhal hain. Panahgah ke garm bistar par aaram karein!",
+                'morale_report': "Hosla aur Sukoon: {val} feesad.",
+                'social_report': "Insani Rabta: {val} feesad.",
+                'full_human_status': "Mukammal Status: Sehat {health}%, Bhook {hunger}%, Pyaas {thirst}%, Tawanai {stamina}%, Hararat {temp}C, Thakawat {fatigue}%, Hosla {morale}%, Rabta {social}%.",
+                'whistle_companion_bark': "Aap ne tez seeti bajayi! Aap ka wafadar kutta khushi se bhonk kar daurta hua aap ke qareeb aa gaya.",
+                'whistle_companion_none': "Aap ne seeti bajayi, par abhi koi sathi nahi mila. Kacha gosht khila kar bheriye ko apna sathi banayein (Key T).",
+                'bedroll_sleep': "Aap garm khaal ke bistar par so gaye. Gehri meethi neend ne tamam thakawat door kar di aur jism tawaana ho gaya.",
+
+                # Audio Settings Menu
+                'menu_audio_settings': "Awaz aur Volume ki Settings",
+                'tab_menu_audio_settings': "Awaz aur Volume Controls",
+                'audio_settings_title': "Awaz aur Volume Controls",
+                'audio_master_vol': "Master Game Volume: {val}%",
+                'audio_ambient_vol': "Mahol Ambience Volume: {val}%",
+                'audio_weather_vol': "Mausam ki Awaz ka Volume: {val}%",
+                'audio_sfx_vol': "Sound Effects (SFX) Volume: {val}%",
+                'audio_vol_up': "Awaz Barhayein (+10%)",
+                'audio_vol_down': "Awaz Kam Karein (-10%)",
 
                 # Controls Guide
                 'controls_guide': (

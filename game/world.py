@@ -749,20 +749,41 @@ class World:
             if self.audio:
                 self.audio.play("footstep_dirt")
 
-    def update_time(self, dt):
+    def update_time(self, dt, character=None):
         """Simulate day/night cycle progression. 1 real second = 1 game minute (24 minutes = 1 full day/night)."""
+        import random
         self.world_time_seconds = (self.world_time_seconds + dt * 2.0) % 1440.0
         self.weather_timer += dt
         if self.weather_timer > 120.0:
             self.weather_timer = 0.0
-            import random
             if self.current_realm_id == 'tundra':
                 weathers = ['clear', 'blizzard', 'clear']
             elif self.current_realm_id == 'underworld':
                 weathers = ['clear']
             else:
                 weathers = ['clear', 'rain', 'clear', 'storm']
-            self.weather = random.choice(weathers)
+            new_w = random.choice(weathers)
+            if new_w != self.weather:
+                self.weather = new_w
+                self._sync_weather_audio(character)
+
+        # Periodic thunder during storms
+        if self.weather == 'storm' and self.audio and random.random() < (0.03 * dt):
+            if hasattr(self.audio, 'play_thunder'):
+                self.audio.play_thunder(close=random.random() < 0.35, pan=random.uniform(-0.8, 0.8))
+
+    def _sync_weather_audio(self, character=None):
+        """Plays appropriate weather sound (rain_ambient outdoors, rain_roof in shelter, or stops if clear)."""
+        if not self.audio:
+            return
+        is_sheltered = getattr(character, 'is_inside_shelter', False) if character else False
+        if self.weather in ('rain', 'storm'):
+            sound_key = 'rain_roof' if is_sheltered else 'rain_ambient'
+            if hasattr(self.audio, 'play_weather'):
+                self.audio.play_weather(sound_key)
+        else:
+            if hasattr(self.audio, 'stop_weather'):
+                self.audio.stop_weather()
 
     def get_time_of_day(self):
         hour = int((self.world_time_seconds / 60.0) % 24)

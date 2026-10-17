@@ -1,9 +1,9 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "name": "Journey of Mankind (Safar-e-Insaan)",
   "release_date": "2026-10-17",
   "min_python": "3.8",
-  "changelog_en": "Authentic studio-recorded zipper audio, spacious 5x5 shelter interior with free movement, door open/close audio effects, strict Travel Point crossing, and GitHub auto-updater.",
-  "changelog_ur": "Asli studio-recorded zipper sound, 5x5 bari panahgah jahan aazadana move kiya ja sakta hai, darwazay ki aawazain, aur GitHub direct auto-updater.",
+  "changelog_en": "Prehistoric Clan Partner System with dialogues & family legacy, lifelike human physiology (fatigue, shivering, panting, bedroll sleep), dynamic weather audio (rain on leaves vs roof, spatial thunder), 4-sample round-robin footsteps with gear rustle, canine companion whistle (Key P), sizzling campfire cooking, and dedicated Audio Settings Menu.",
+  "changelog_ur": "Qadeem Hamsafar & Partner Nizam ba-ma guftagoo aur agli nasal ka aaghaz, asli insani jism (thakawat, thand se kapkapahat, haanpna, bistar par aaram), mausam ki aawazain (chhat par aur khulay asman talay barish, garaj chamak), 4 variations walay qadmon ki aawazain aur leather rustle, kuttay ki seeti (P key), bhoonay gosht ki aawaz, aur mukammal Awaz Settings Menu.",
   "download_url": "https://github.com/shakeelahmadakash64-dev/Journey_Of_Mankind/archive/refs/heads/main.zip"
 }

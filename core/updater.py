@@ -20,7 +20,7 @@ import urllib.request
 import pygame
 from core.localization import loc
 
-CURRENT_VERSION = "1.2.0"
+CURRENT_VERSION = "1.3.0"
 GITHUB_OWNER = "shakeelahmadakash64-dev"
 GITHUB_REPO = "Journey_Of_Mankind"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/version.json"

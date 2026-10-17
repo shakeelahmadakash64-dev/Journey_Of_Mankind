@@ -76,6 +76,14 @@ class Database:
                 cursor.execute("ALTER TABLE character_state ADD COLUMN elevation INTEGER DEFAULT 0")
             if 'facing' not in cols:
                 cursor.execute("ALTER TABLE character_state ADD COLUMN facing TEXT DEFAULT 'North'")
+            if 'fatigue' not in cols:
+                cursor.execute("ALTER TABLE character_state ADD COLUMN fatigue REAL DEFAULT 0.0")
+            if 'morale' not in cols:
+                cursor.execute("ALTER TABLE character_state ADD COLUMN morale REAL DEFAULT 90.0")
+            if 'social' not in cols:
+                cursor.execute("ALTER TABLE character_state ADD COLUMN social REAL DEFAULT 70.0")
+            if 'partner_data' not in cols:
+                cursor.execute("ALTER TABLE character_state ADD COLUMN partner_data TEXT DEFAULT ''")
             
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS inventory (
@@ -105,7 +113,7 @@ class Database:
                     (username, pin_hash, now, now)
                 )
                 cursor.execute(
-                    "INSERT INTO character_state (username, health, hunger, thirst, stamina, temperature, pos_x, pos_y, elevation, facing) VALUES (?, 100.0, 100.0, 100.0, 100.0, 37.0, 0, 0, 0, 'North')",
+                    "INSERT INTO character_state (username, health, hunger, thirst, stamina, temperature, pos_x, pos_y, elevation, facing, fatigue, morale, social, partner_data) VALUES (?, 100.0, 100.0, 100.0, 100.0, 37.0, 0, 0, 0, 'North', 0.0, 90.0, 70.0, '')",
                     (username,)
                 )
                 starting_items = [
@@ -151,7 +159,7 @@ class Database:
             if not p_row:
                 return None
             
-            cursor.execute("SELECT health, hunger, thirst, stamina, temperature, pos_x, pos_y, elevation, facing FROM character_state WHERE username = ?", (username,))
+            cursor.execute("SELECT health, hunger, thirst, stamina, temperature, pos_x, pos_y, elevation, facing, fatigue, morale, social, partner_data FROM character_state WHERE username = ?", (username,))
             c_row = cursor.fetchone()
             
             cursor.execute("SELECT item_id, item_name, quantity FROM inventory WHERE username = ?", (username,))
@@ -175,7 +183,11 @@ class Database:
                     'pos_x': c_row[5],
                     'pos_y': c_row[6],
                     'elevation': c_row[7] if len(c_row) > 7 and c_row[7] is not None else 0,
-                    'facing': c_row[8] if len(c_row) > 8 and c_row[8] is not None else 'North'
+                    'facing': c_row[8] if len(c_row) > 8 and c_row[8] is not None else 'North',
+                    'fatigue': float(c_row[9]) if len(c_row) > 9 and c_row[9] is not None else 0.0,
+                    'morale': float(c_row[10]) if len(c_row) > 10 and c_row[10] is not None else 90.0,
+                    'social': float(c_row[11]) if len(c_row) > 11 and c_row[11] is not None else 70.0,
+                    'partner_data': str(c_row[12]) if len(c_row) > 12 and c_row[12] is not None else ''
                 },
                 'inventory': [{'id': r[0], 'name': r[1], 'quantity': r[2]} for r in inv_rows]
             }
@@ -202,12 +214,14 @@ class Database:
             cursor.execute('''
                 UPDATE character_state SET
                     health = ?, hunger = ?, thirst = ?, stamina = ?, temperature = ?, pos_x = ?, pos_y = ?,
-                    elevation = ?, facing = ?
+                    elevation = ?, facing = ?, fatigue = ?, morale = ?, social = ?, partner_data = ?
                 WHERE username = ?
             ''', (
                 stats['health'], stats['hunger'], stats['thirst'],
                 stats['stamina'], stats['temperature'], stats['pos_x'], stats['pos_y'],
                 stats.get('elevation', 0), stats.get('facing', 'North'),
+                stats.get('fatigue', 0.0), stats.get('morale', 90.0), stats.get('social', 70.0),
+                stats.get('partner_data', ''),
                 username
             ))
             

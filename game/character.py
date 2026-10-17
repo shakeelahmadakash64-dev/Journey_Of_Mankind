@@ -5,7 +5,9 @@ and equipped weapons for prehistoric combat.
 """
 
 import time
+import json
 from core.localization import loc
+from game.partner import PartnerSystem
 
 DIRECTIONS = ['North', 'East', 'South', 'West']
 
@@ -26,6 +28,10 @@ class Character:
             self.pos_y = int(stats.get('pos_y', 0))
             self.elevation = int(stats.get('elevation', 0))
             self.facing = str(stats.get('facing', 'North'))
+            self.fatigue = float(stats.get('fatigue', 0.0))
+            self.morale = float(stats.get('morale', 90.0))
+            self.social = float(stats.get('social', 70.0))
+            p_data = stats.get('partner_data', '')
         else:
             self.health = 100.0
             self.hunger = 100.0
@@ -36,7 +42,23 @@ class Character:
             self.pos_y = 0
             self.elevation = 0
             self.facing = 'North'
+            self.fatigue = 0.0
+            self.morale = 90.0
+            self.social = 70.0
+            p_data = ''
             
+        self.partner = PartnerSystem(audio=self.audio, speech=self.speech)
+        if p_data:
+            try:
+                p_dict = json.loads(p_data) if isinstance(p_data, str) else p_data
+                self.partner.load_dict(p_dict)
+            except Exception:
+                pass
+
+        self.last_yawn_time = 0.0
+        self.last_shiver_time = 0.0
+        self.last_panting_time = 0.0
+
         self.inventory = inventory if inventory is not None else []
         self._ensure_starting_books()
         self.equipped_weapon = 'fists'
@@ -122,7 +144,11 @@ class Character:
             'pos_x': self.pos_x,
             'pos_y': self.pos_y,
             'elevation': self.elevation,
-            'facing': self.facing
+            'facing': self.facing,
+            'fatigue': round(self.fatigue, 1),
+            'morale': round(self.morale, 1),
+            'social': round(self.social, 1),
+            'partner_data': json.dumps(self.partner.get_dict())
         }
 
     @property
@@ -184,6 +210,7 @@ class Character:
         if not self.is_alive:
             return
 
+        now = time.time()
         thirst_drain = 0.15 * elapsed_seconds
         hunger_drain = 0.08 * elapsed_seconds
         
@@ -196,15 +223,45 @@ class Character:
                 self.stamina = min(100.0, self.stamina + (5.0 * elapsed_seconds))
             if self.health < 100.0:
                 self.health = min(100.0, self.health + (1.0 * elapsed_seconds))
+            self.morale = min(100.0, self.morale + (0.1 * elapsed_seconds))
+            if self.partner.is_rescued and self.partner.status == 'at_shelter':
+                self.social = min(100.0, self.social + (0.15 * elapsed_seconds))
+            self.fatigue = max(0.0, self.fatigue - (0.05 * elapsed_seconds))
         else:
             if self.stamina < 100.0:
                 self.stamina = min(100.0, self.stamina + (2.0 * elapsed_seconds))
+
+            # Fatigue accumulation in the wild
+            self.fatigue = min(100.0, self.fatigue + (0.02 * elapsed_seconds))
+            self.social = max(0.0, self.social - (0.008 * elapsed_seconds))
 
             ideal_temp = 37.0 if self.has_fire else 36.6
             if self.temperature > ideal_temp:
                 self.temperature = max(ideal_temp, self.temperature - 0.02 * elapsed_seconds)
             elif self.temperature < ideal_temp:
                 self.temperature = min(ideal_temp, self.temperature + 0.02 * elapsed_seconds)
+
+            # Autonomous realistic physiological audio alerts
+            if self.audio:
+                # Shivering in severe cold (< 34.5 C)
+                if self.temperature < 34.5 and (now - self.last_shiver_time > 30.0):
+                    self.last_shiver_time = now
+                    if hasattr(self.audio, 'play_shiver'):
+                        self.audio.play_shiver()
+
+                # Heavy panting when stamina drops < 25%
+                if self.stamina < 25.0 and (now - self.last_panting_time > 10.0):
+                    self.last_panting_time = now
+                    if hasattr(self.audio, 'play_heavy_panting'):
+                        self.audio.play_heavy_panting()
+                    else:
+                        self.audio.play_voice_pant()
+
+                # Yawning when fatigue > 75%
+                if self.fatigue > 75.0 and (now - self.last_yawn_time > 60.0):
+                    self.last_yawn_time = now
+                    if hasattr(self.audio, 'play_yawn'):
+                        self.audio.play_yawn()
 
         if self.thirst <= 0.0 or self.hunger <= 0.0:
             damage = 0.3 * elapsed_seconds
@@ -268,17 +325,77 @@ class Character:
             self.speech.speak(txt)
         return txt
 
+    def report_fatigue(self):
+        txt = loc.tr('fatigue_report', val=int(self.fatigue))
+        if self.fatigue > 75:
+            txt += " " + loc.tr('fatigue_alert')
+            if self.audio and hasattr(self.audio, 'play_yawn'):
+                self.audio.play_yawn()
+        if self.speech:
+            self.speech.speak(txt)
+        return txt
+
+    def report_morale(self):
+        txt = loc.tr('morale_report', val=int(self.morale))
+        if self.speech:
+            self.speech.speak(txt)
+        return txt
+
+    def report_social(self):
+        txt = loc.tr('social_report', val=int(self.social))
+        if self.speech:
+            self.speech.speak(txt)
+        return txt
+
     def report_full_status(self):
-        txt = loc.tr('status_report',
+        txt = loc.tr('full_human_status',
             health=int(self.health),
             hunger=int(self.hunger),
             thirst=int(self.thirst),
             stamina=int(self.stamina),
-            temp=f"{self.temperature:.1f}"
+            temp=f"{self.temperature:.1f}",
+            fatigue=int(self.fatigue),
+            morale=int(self.morale),
+            social=int(self.social)
         )
         if self.speech:
             self.speech.speak(txt)
         return txt
+
+    def whistle_companion(self):
+        """Called on Key P: Whistles into the winds to summon canine companion / boost morale."""
+        if self.audio and hasattr(self.audio, 'play_whistle'):
+            self.audio.play_whistle()
+        time.sleep(0.3)
+        if self.pet:
+            if self.audio and hasattr(self.audio, 'play_dog_bark'):
+                self.audio.play_dog_bark()
+            self.social = min(100.0, self.social + 15.0)
+            self.morale = min(100.0, self.morale + 10.0)
+            msg = loc.tr('whistle_companion_bark')
+        else:
+            msg = loc.tr('whistle_companion_none')
+        if self.speech:
+            self.speech.speak(msg)
+
+    def rest_bedroll(self):
+        """Called when resting at the shelter bedroll (0, 1): sleep, clear fatigue, heal wounds."""
+        self.fatigue = 0.0
+        self.stamina = 100.0
+        self.health = min(100.0, self.health + 40.0)
+        self.morale = 100.0
+        if self.partner.is_rescued:
+            self.social = 100.0
+            self.partner.affection = min(100.0, self.partner.affection + 2.0)
+        
+        if self.audio:
+            if hasattr(self.audio, 'play_yawn'):
+                self.audio.play_yawn()
+            self.audio.play_shelter_enter()
+        msg = loc.tr('bedroll_sleep')
+        if self.speech:
+            self.speech.speak(msg)
+        return msg
 
     def drink_water(self):
         if self.thirst >= 99.0:
@@ -362,7 +479,11 @@ class Character:
 
         self.add_item('cooked_meat', loc.tr('item_cooked_meat'), 1)
         if self.audio:
-            self.audio.play("flint_strike")
+            if hasattr(self.audio, 'start_meat_sizzle'):
+                self.audio.start_meat_sizzle()
+                time.sleep(1.0)
+                self.audio.stop_meat_sizzle()
+            self.audio.play("menu_select")
         msg = loc.tr('roast_success')
         if self.speech:
             self.speech.speak(msg)
@@ -407,7 +528,7 @@ class Character:
             quest_system.check_milestone(self, 'tame_wolf')
         return True
 
-    def enter_shelter(self, quest_system=None):
+    def enter_shelter(self, quest_system=None, world=None):
         """Enters Lean-to shelter (called on Shift + Enter). Shelters from storm, regenerates stats, and allows free indoor exploration."""
         self.is_inside_shelter = True
         self.shelter_x = 0
@@ -420,6 +541,9 @@ class Character:
                 self.audio.play_door_close()
             if hasattr(self.audio, 'set_shelter_ambience'):
                 self.audio.set_shelter_ambience()
+            if world and getattr(world, 'weather', 'clear') in ('rain', 'storm'):
+                if hasattr(self.audio, 'play_weather'):
+                    self.audio.play_weather('rain_roof')
         msg = loc.tr('shelter_entered')
         if self.speech:
             self.speech.speak(msg)
@@ -428,7 +552,7 @@ class Character:
             qs.check_milestone(self, 'rest_shelter')
         return True
 
-    def exit_shelter(self, realm_id=None):
+    def exit_shelter(self, realm_id=None, world=None):
         """Exits Lean-to shelter back into the open world (called on Shift + Enter or walking out door)."""
         self.is_inside_shelter = False
         if self.audio:
@@ -439,6 +563,12 @@ class Character:
                 self.audio.play_door_close()
             if realm_id and hasattr(self.audio, 'set_realm_ambience'):
                 self.audio.set_realm_ambience(realm_id)
+            if world and getattr(world, 'weather', 'clear') in ('rain', 'storm'):
+                if hasattr(self.audio, 'play_weather'):
+                    self.audio.play_weather('rain_ambient')
+            else:
+                if hasattr(self.audio, 'stop_weather'):
+                    self.audio.stop_weather()
         msg = loc.tr('shelter_exited')
         if self.speech:
             self.speech.speak(msg)
@@ -495,9 +625,14 @@ class Character:
             (-1, -1): loc.tr('shelter_loc_sw'),
             (1, -1): loc.tr('shelter_loc_se'),
         }
-        if (x, y) in coords_map:
-            return coords_map[(x, y)]
-        return f"Shelter Interior ({x}, {y})" if loc.lang == 'en' else f"Panahgah ke Andar ({x}, {y})"
+        base_desc = coords_map.get((x, y), f"Shelter Interior ({x}, {y})" if loc.lang == 'en' else f"Panahgah ke Andar ({x}, {y})")
+        if x == 0 and y == 0 and hasattr(self, 'partner') and self.partner.is_rescued and self.partner.status == 'at_shelter':
+            p_hint = f" [{self.partner.name} is seated by the warm hearth. Press P or T to talk!]" if loc.lang == 'en' else f" [{self.partner.name} choolhay ke paas baithi hai. Baat karne ke liay P ya T dabayein!]"
+            base_desc += p_hint
+        elif x == 0 and y == 1:
+            bed_hint = " [Soft Fur Bedroll. Press B to sleep and clear fatigue]" if loc.lang == 'en' else " [Garm Bistar. Thakawat door karne ke liay sonay ke liay B dabayein]"
+            base_desc += bed_hint
+        return base_desc
 
     def add_item(self, item_id, item_name, quantity=1):
         for item in self.inventory:

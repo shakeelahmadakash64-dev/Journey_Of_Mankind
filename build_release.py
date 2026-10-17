@@ -60,11 +60,18 @@ def build():
     print(f"[PASS] Successfully built {exe_target}")
     
     # Copy app_icon.ico and sounds directly to dist directory as well
+    import json
+    version_file = os.path.join(SCRIPT_DIR, "version.json")
+    with open(version_file, "r", encoding="utf-8") as f:
+        v_info = json.load(f)
+    app_version = v_info.get("version", "1.3.0")
+
     shutil.copy2(os.path.join(SCRIPT_DIR, "app_icon.ico"), os.path.join(dist_dir, "JourneyOfMankind", "app_icon.ico"))
     shutil.copy2(os.path.join(SCRIPT_DIR, "version.json"), os.path.join(dist_dir, "JourneyOfMankind", "version.json"))
     dist_sounds = os.path.join(dist_dir, "JourneyOfMankind", "sounds")
-    if not os.path.exists(dist_sounds):
-        shutil.copytree(os.path.join(SCRIPT_DIR, "sounds"), dist_sounds)
+    if os.path.exists(dist_sounds):
+        shutil.rmtree(dist_sounds)
+    shutil.copytree(os.path.join(SCRIPT_DIR, "sounds"), dist_sounds)
     
     print("=" * 60)
     print("2. PREPARING INNO SETUP SCRIPT FOR WINDOWS 10 / 11 INSTALLER...")
@@ -76,7 +83,7 @@ def build():
 ; Fully accessible with NVDA, JAWS, Narrator
 
 #define MyAppName "Journey of Mankind"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "{app_version}"
 #define MyAppPublisher "Shakeel Ahmad Akash"
 #define MyAppURL "https://github.com/shakeelahmadakash64-dev/Journey_Of_Mankind"
 #define MyAppExeName "JourneyOfMankind.exe"
@@ -95,7 +102,7 @@ DefaultGroupName={{#MyAppName}}
 AllowNoIcons=yes
 LicenseFile={os.path.join(SCRIPT_DIR, 'README.md')}
 OutputDir={os.path.join(SCRIPT_DIR, 'dist_installer')}
-OutputBaseFilename=Journey_Of_Mankind_Setup_v1.2.0
+OutputBaseFilename=Journey_Of_Mankind_Setup_v{app_version}
 SetupIconFile={os.path.join(SCRIPT_DIR, 'app_icon.ico')}
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -138,7 +145,7 @@ Filename: "{{app}}\\{{#MyAppExeName}}"; Description: "{{cm:LaunchProgram,{{#Stri
         print("[FAIL] Inno Setup compiler failed with exit code:", res_iss.returncode)
         sys.exit(res_iss.returncode)
         
-    setup_exe = os.path.join(SCRIPT_DIR, "dist_installer", "Journey_Of_Mankind_Setup_v1.2.0.exe")
+    setup_exe = os.path.join(SCRIPT_DIR, "dist_installer", f"Journey_Of_Mankind_Setup_v{app_version}.exe")
     if not os.path.exists(setup_exe):
         print("[FAIL] Installer exe not found at:", setup_exe)
         sys.exit(1)
